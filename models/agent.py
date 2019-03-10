@@ -18,6 +18,7 @@ RANDOM_SEED = 42
 EPSILON_START = 1.
 EPSILON_END = 0.01
 EPSILON_ANNEALING_INTERVAL = 300
+SHUFFLE_ACTIONS = False
 
 State = namedtuple(
     'State', [
@@ -187,6 +188,8 @@ class TrainableAgent(Agent):
                               admissible_action_tokens in admissible_actions_tokens]
     result = np.array(pad_sequences(
       admissible_actions_ids, max_len=self.get_actions_padding_size()))
+    if SHUFFLE_ACTIONS:
+      np.random.shuffle(result)
     return result
 
   def _build_action_ids(self, action):
