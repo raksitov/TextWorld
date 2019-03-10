@@ -10,16 +10,6 @@ from util import words_to_ids, preproc, pad_sequences, max_len
 
 from numpy.random import RandomState
 
-SUMMARY_DIR = 'Summaries'
-GAMMA = 0.5
-TRAINING_BATCH_SIZE = 20
-REPLAY_MEMORY_SIZE = 10000
-RANDOM_SEED = 42
-EPSILON_START = 1.
-EPSILON_END = 0.01
-EPSILON_ANNEALING_INTERVAL = 300
-SHUFFLE_ACTIONS = True
-
 State = namedtuple(
     'State', [
         'observation_ids',
@@ -53,27 +43,29 @@ class RandomAgent(Agent):
 
   def __init__(self):
     # TODO: move seed into an argument.
-    self.rng = RandomState(RANDOM_SEED)
+    self.rng = RandomState(self.config['random_seed'])
     return
 
   def choose_actions(self, observations, infos, dones):
-    return [self.rng.choice(info["admissible_commands"]) for info in infos]
+    return [self.rng.choice(info['admissible_commands']) for info in infos]
 
 
 class TrainableAgent(Agent):
 
-  def __init__(self, embedding_matrix, word_ids):
+  def __init__(self, config, embedding_matrix, word_ids):
+    self.config = config['agent']
     self.word_ids = word_ids
     self.states = []
-    self.epsilon = EPSILON_START
+    self.epsilon = self.config['epsilon_start']
     self.episode = 0
 
     self.nlp = spacy.load('en', disable=['ner', 'parser', 'tagger'])
-    self.rng = RandomState(RANDOM_SEED)
+    self.rng = RandomState(self.config['random_seed'])
 
     tf.reset_default_graph()
     self.session = tf.Session()
     self.model = self.get_model()(
+        config,
         self.session,
         'Model',
         embedding_matrix,
@@ -82,30 +74,31 @@ class TrainableAgent(Agent):
     return
 
   def _get_summary_dir(self):
-    return SUMMARY_DIR
+    return self.config['summary_dir']
 
   def choose_actions(self, observations, infos, dones):
     random_plays = np.random.uniform(low=0.0, high=1.0, size=len(observations))
     chosen_actions = []
     for observation, info, done, random_play in zip(observations, infos, dones, random_plays):
       if random_play < self.epsilon or done:
-        chosen_actions.append(self.rng.choice(info["admissible_commands"]))
+        chosen_actions.append(self.rng.choice(info['admissible_commands']))
       else:
         _, probabilities = self.model.predict(
             np.tile(
                 np.array(self._build_observation_ids(observation, info)),
-                (len(info["admissible_commands"]), 1)),
+                (len(info['admissible_commands']), 1)),
             self._build_admissible_actions_ids(info, shuffle=False))
-        chosen_actions.append(info["admissible_commands"][np.argmax(probabilities)])
+        chosen_actions.append(info['admissible_commands'][np.argmax(probabilities)])
     return chosen_actions
 
   def add_state(self, observation, info, action, new_observation, new_info, reward, done):
     self.states.append(State(self._build_observation_ids(observation, info),
-                             self._build_admissible_actions_ids(info, shuffle=SHUFFLE_ACTIONS),
+                             self._build_admissible_actions_ids(info,
+                               shuffle=self.config['shuffle_actions']),
                              self._build_action_ids(action),
                              self._build_observation_ids(new_observation, new_info),
                              self._build_admissible_actions_ids(
-                               new_info, shuffle=SHUFFLE_ACTIONS), reward, done))
+                               new_info, shuffle=self.config['shuffle_actions']), reward, done))
     return
 
   def get_model(self):
@@ -128,7 +121,7 @@ class TrainableAgent(Agent):
       observations_ids.append(sample.observation_ids)
       reward = sample.reward
       if not sample.done:
-        reward += GAMMA * self._Q(sample)
+        reward += self.config['gamma'] * self._Q(sample)
       rewards.append(reward)
       actions_ids.append(sample.action_ids)
     self.model.train(
@@ -139,9 +132,10 @@ class TrainableAgent(Agent):
 
   def end_episode(self):
     self.episode += 1
-    if self.episode <= EPSILON_ANNEALING_INTERVAL:
-      self.epsilon -= (EPSILON_START - EPSILON_END) / float(EPSILON_ANNEALING_INTERVAL)
-    self.print_stats()
+    if self.episode <= self.config['epsilon_annealing_interval']:
+      self.epsilon -= ((self.config['epsilon_start'] - self.config['epsilon_end']) /
+          float(self.config['epsilon_annealing_interval']))
+    #self.print_stats()
     return
 
   def cleanup(self):
@@ -157,14 +151,14 @@ class TrainableAgent(Agent):
   def _recent_memories(self):
     start = 0
     # TODO: replace with circular buffer.
-    if len(self.states) >= REPLAY_MEMORY_SIZE:
-      start = -REPLAY_MEMORY_SIZE
+    if len(self.states) >= self.config['replay_memory_size']:
+      start = -self.config['replay_memory_size']
     return self.states[start:]
 
   def _get_batch(self):
-    if len(self.states) < TRAINING_BATCH_SIZE:
+    if len(self.states) < self.config['training_batch_size']:
       return None
-    return random.sample(self._recent_memories(), TRAINING_BATCH_SIZE)
+    return random.sample(self._recent_memories(), self.config['training_batch_size'])
 
   def _Q(self, sample):
     q_values, _ = self.model.predict(

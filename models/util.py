@@ -13,18 +13,18 @@ def words_to_ids(words, word_ids):
 
 def preproc(s, str_type='None', tokenizer=None, lower_case=True):
   if s is None:
-    return ["nothing"]
-  s = s.replace("\n", ' ')
-  if s.strip() == "":
-    return ["nothing"]
+    return ['nothing']
+  s = s.replace('\n', ' ')
+  if s.strip() == '':
+    return ['nothing']
   if str_type == 'feedback':
-    if "$$$$$$$" in s:
-      s = ""
-      if "-=" in s:
-        s = s.split("-=")[0]
+    if '$$$$$$$' in s:
+      s = ''
+      if '-=' in s:
+        s = s.split('-=')[0]
   s = s.strip()
   if len(s) == 0:
-    return ["nothing"]
+    return ['nothing']
   tokens = [t.text for t in tokenizer(s)]
   if lower_case:
     tokens = [t.lower() for t in tokens]

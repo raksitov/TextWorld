@@ -1,0 +1,26 @@
+main:
+  episodes: 1000
+  games_path: '/home/renat/WorkingDir/cs230/TextWorld/sample_games'
+  vocab_path: '/home/renat/WorkingDir/cs230/TextWorld/vocab.txt'
+  glove_path: '/home/renat/WorkingDir/cs224n/squad/data/glove.6B.50d.txt'
+  glove_dim: 50
+  environment_batch_size: 20
+  update_frequency: 1
+
+agent:
+  summary_dir: 'Summaries'
+  gamma: 0.5
+  training_batch_size: 20
+  replay_memory_size: 10000
+  random_seed: 42
+  epsilon_start: 1.
+  epsilon_end: 0.01
+  epsilon_annealing_interval: 300
+  shuffle_actions: True
+
+model:
+  clip_by_norm: 0
+  learning_rate: 0.001
+  states_network: [128, 16]
+  actions_network: [16]
+  softmax_scaling_factor: 0

@@ -7,17 +7,14 @@ import tensorflow as tf
 from tensorflow.python.ops import embedding_ops
 from tensorflow.contrib import layers
 
-CLIP_BY_NORM = None
-LEARNING_RATE = 0.001
-STATES_NETWORK = [128, 16]
-ACTIONS_NETWORK = [16]
-SOFTMAX_SCALING_FACTOR = None
 DEBUG = False
+
 
 def _print_shape(tensor, message):
   if DEBUG:
     return tf.Print(tensor, [tf.shape(tensor)], message)
   return tensor
+
 
 def _fully_connected_encoder(layer, network_structure, scope_name):
   with tf.variable_scope(scope_name) as scope:
@@ -30,16 +27,15 @@ def _fully_connected_encoder(layer, network_structure, scope_name):
 
 class BagOfWordsModel:
 
-  def __init__(self, session, scope, embedding_matrix, summaries_dir=None):
+  def __init__(self, config, session, scope, embedding_matrix, summaries_dir=None):
+    self.config = config['model']
+    self.counter = 0
+    self.session = session
     with tf.variable_scope(scope):
-      self.counter = 0
-      self.session = session
-      self.states_network = STATES_NETWORK
-      self.actions_network = ACTIONS_NETWORK
       self.states = tf.placeholder(tf.int32, shape=(None, None))
       self.labels = tf.placeholder(tf.float32, shape=(None,))
       self.actions = tf.placeholder(tf.int32, shape=(None, None))
-      self.learning_rate = tf.placeholder_with_default(LEARNING_RATE, shape=())
+      self.learning_rate = tf.placeholder_with_default(self.config['learning_rate'], shape=())
 
       self._add_embedding_layer(embedding_matrix)
       self._build_network()
@@ -71,11 +67,12 @@ class BagOfWordsModel:
 
   def predict(self, observations, actions):
     #print('Predict: {}, {}'.format(observations.shape, actions.shape))
-    q_values, probabilities = self.session.run([self.q_values, self.probabilities],
-                                               feed_dict={
-        self.states: observations,
-        self.actions: actions,
-    })
+    q_values, probabilities = self.session.run(
+        [self.q_values, self.probabilities],
+        feed_dict={
+            self.states: observations,
+            self.actions: actions,
+        })
     return q_values, probabilities
 
   def cleanup(self):
@@ -83,11 +80,11 @@ class BagOfWordsModel:
     return
 
   def _minimize(self, optimizer):
-    if CLIP_BY_NORM:
+    if self.config['clip_by_norm']:
       gradients = optimizer.compute_gradients(self.loss)
       for i, (gradient, variable) in enumerate(gradients):
         if gradient is not None:
-          gradients[i] = (tf.clip_by_norm(gradient, CLIP_BY_NORM), variable)
+          gradients[i] = (tf.clip_by_norm(gradient, self.config['clip_by_norm']), variable)
       return optimizer.apply_gradients(gradients)
     return optimizer.minimize(self.loss)
 
@@ -102,13 +99,15 @@ class BagOfWordsModel:
   def _build_network(self):
     states_input = tf.reduce_mean(self.states_embeddings, axis=1)
     actions_input = tf.reduce_mean(self.actions_embeddings, axis=1)
-    states_output = _fully_connected_encoder(states_input, self.states_network, 'States')
-    actions_output = _fully_connected_encoder(actions_input, self.actions_network, 'Actions')
+    states_output = _fully_connected_encoder(states_input, self.config['states_network'], 'States')
+    actions_output = _fully_connected_encoder(
+        actions_input, self.config['actions_network'], 'Actions')
 
     self.q_values = tf.tensordot(states_output, actions_output, axes=([1], [1]))
     self.probabilities = self.q_values
-    if SOFTMAX_SCALING_FACTOR:
-      self.probabilities = tf.multinomial(self.q_values * SOFTMAX_SCALING_FACTOR, num_samples=1)
+    if self.config['softmax_scaling_factor']:
+      self.probabilities = tf.multinomial(
+          self.q_values * self.config['softmax_scaling_factor'], num_samples=1)
 
     self.loss = tf.reduce_sum(tf.square(self.labels - self.q_values))
     optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
