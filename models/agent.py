@@ -4,9 +4,9 @@ import random
 import numpy as np
 import tensorflow as tf
 
-from model import BagOfWordsModel
+from model import BagOfWordsModel#, ConcatenatedWordsModel
 from collections import namedtuple
-from util import words_to_ids, preproc, pad_sequences
+from util import words_to_ids, preproc, pad_sequences, max_len
 
 from numpy.random import RandomState
 
@@ -59,7 +59,7 @@ class RandomAgent(Agent):
     return [self.rng.choice(info["admissible_commands"]) for info in infos]
 
 
-class BagOfWordsAgent(Agent):
+class TrainableAgent(Agent):
 
   def __init__(self, embedding_matrix, word_ids):
     self.word_ids = word_ids
@@ -72,7 +72,7 @@ class BagOfWordsAgent(Agent):
 
     tf.reset_default_graph()
     self.session = tf.Session()
-    self.model = BagOfWordsModel(
+    self.model = self.get_model()(
         self.session,
         'Model',
         embedding_matrix,
@@ -90,12 +90,12 @@ class BagOfWordsAgent(Agent):
       if random_play < self.epsilon or done:
         chosen_actions.append(self.rng.choice(info["admissible_commands"]))
       else:
-        predictions = self.model.predict(
+        _, probabilities = self.model.predict(
             np.tile(
                 np.array(self._build_observation_ids(observation, info)),
                 (len(info["admissible_commands"]), 1)),
             self._build_admissible_actions_ids(info))
-        chosen_actions.append(info["admissible_commands"][np.argmax(predictions)])
+        chosen_actions.append(info["admissible_commands"][np.argmax(probabilities)])
     return chosen_actions
 
   def add_state(self, observation, info, action, new_observation, new_info, reward, done):
@@ -106,10 +106,14 @@ class BagOfWordsAgent(Agent):
                              self._build_admissible_actions_ids(new_info), reward, done))
     return
 
-  def cleanup(self):
-    self.model.cleanup()
-    self.session.close()
-    return
+  def get_model(self):
+    raise NotImplementedError
+
+  def get_observation_padding_size(self):
+    raise NotImplementedError
+
+  def get_actions_padding_size(self):
+    raise NotImplementedError
 
   def train(self):
     batch = self._get_batch()
@@ -126,16 +130,27 @@ class BagOfWordsAgent(Agent):
       rewards.append(reward)
       actions_ids.append(sample.action_ids)
     self.model.train(
-        np.stack(pad_sequences(observations_ids)),
+        np.stack(pad_sequences(observations_ids, max_len=self.get_observation_padding_size())),
         np.stack(rewards),
-        np.stack(pad_sequences(actions_ids)))
+        np.stack(pad_sequences(actions_ids, max_len=self.get_actions_padding_size())))
     return
 
   def end_episode(self):
     self.episode += 1
     if self.episode <= EPSILON_ANNEALING_INTERVAL:
       self.epsilon -= (EPSILON_START - EPSILON_END) / float(EPSILON_ANNEALING_INTERVAL)
+    self.print_stats()
     return
+
+  def cleanup(self):
+    self.model.cleanup()
+    self.session.close()
+    return
+
+  def print_stats(self):
+    all_states = State(*zip(*self.states))
+    print('observation max length: {}, action max length: {}'.format(
+      max_len(all_states.observation_ids), max_len(all_states.action_ids)))
 
   def _recent_memories(self):
     start = 0
@@ -150,13 +165,13 @@ class BagOfWordsAgent(Agent):
     return random.sample(self._recent_memories(), TRAINING_BATCH_SIZE)
 
   def _Q(self, sample):
-    predictions = self.model.predict(
+    q_values, _ = self.model.predict(
         np.tile(
             np.array(sample.new_observation_ids),
             (len(sample.new_admissible_actions_ids), 1)),
         sample.new_admissible_actions_ids)
-    #print('_Q: {}'.format(predictions))
-    return np.max(predictions)
+    #print('_Q: {}'.format(q_values))
+    return np.max(q_values)
 
   def _build_observation_ids(self, observation, info):
     observation_tokens = preproc(observation, str_type='feedback', tokenizer=self.nlp)
@@ -170,9 +185,22 @@ class BagOfWordsAgent(Agent):
                                  admissible_action in info['admissible_commands']]
     admissible_actions_ids = [words_to_ids(admissible_action_tokens, self.word_ids) for
                               admissible_action_tokens in admissible_actions_tokens]
-    return np.array(pad_sequences(admissible_actions_ids))
+    result = np.array(pad_sequences(
+      admissible_actions_ids, max_len=self.get_actions_padding_size()))
+    return result
 
   def _build_action_ids(self, action):
     action_tokens = preproc(action, tokenizer=self.nlp)
     action_ids = words_to_ids(action_tokens, self.word_ids)
     return action_ids
+
+class BagOfWordsAgent(TrainableAgent):
+
+  def get_model(self):
+    return BagOfWordsModel
+
+  def get_observation_padding_size(self):
+    return None
+
+  def get_actions_padding_size(self):
+    return None
