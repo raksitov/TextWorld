@@ -31,21 +31,25 @@ def preproc(s, str_type='None', tokenizer=None, lower_case=True):
   return tokens
 
 
-def pad_sequences(sequences, maxlen=None, dtype='int32', value=0.):
+def max_len(list_of_list):
+  return max(map(len, list_of_list))
+
+
+def pad_sequences(sequences, max_len=None, dtype='int32', value=0.):
   '''
   Partially borrowed from Keras
   # Arguments
       sequences: list of lists where each element is a sequence
-      maxlen: int, maximum length
+      max_len: int, maximum length
       dtype: type to cast the resulting sequence.
       value: float, value to pad the sequences to the desired value.
   # Returns
-      x: numpy array with dimensions (number_of_sequences, maxlen)
+      x: numpy array with dimensions (number_of_sequences, max_len)
   '''
   lengths = [len(s) for s in sequences]
   nb_samples = len(sequences)
-  if maxlen is None:
-    maxlen = np.max(lengths)
+  if max_len is None:
+    max_len = np.max(lengths)
   # take the sample shape from the first non empty sequence
   # checking for consistency in the main loop below.
   sample_shape = tuple()
@@ -53,18 +57,17 @@ def pad_sequences(sequences, maxlen=None, dtype='int32', value=0.):
     if len(s) > 0:
       sample_shape = np.asarray(s).shape[1:]
       break
-  x = (np.ones((nb_samples, maxlen) + sample_shape) * value).astype(dtype)
+  x = (np.ones((nb_samples, max_len) + sample_shape) * value).astype(dtype)
   for idx, s in enumerate(sequences):
     if len(s) == 0:
       continue  # empty list was found
     # pre truncating
-    trunc = s[-maxlen:]
+    trunc = s[-max_len:]
     # check `trunc` has expected shape
     trunc = np.asarray(trunc, dtype=dtype)
     if trunc.shape[1:] != sample_shape:
-      raise ValueError(
-          'Shape of sample %s of sequence at position %s is different from expected shape %s' %
-          (trunc.shape[1:], idx, sample_shape))
+      raise ValueError(('Shape of sample %s of sequence at position %s is different' +
+                        'from expected shape %s').format(trunc.shape[1:], idx, sample_shape))
     # post padding
     x[idx, :len(trunc)] = trunc
   return x
