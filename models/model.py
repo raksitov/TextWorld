@@ -7,10 +7,11 @@ import tensorflow as tf
 from tensorflow.python.ops import embedding_ops
 from tensorflow.contrib import layers
 
-CLIP_BY_NORM = 0
+CLIP_BY_NORM = None
 LEARNING_RATE = 0.001
 STATES_NETWORK = [128, 16]
 ACTIONS_NETWORK = [16]
+SOFTMAX_SCALING_FACTOR = None
 
 
 def _fully_connected_encoder(layer, network_structure):
@@ -63,9 +64,12 @@ class BagOfWordsModel:
 
   def predict(self, observations, actions):
     #print('Predict: {}, {}'.format(observations.shape, actions.shape))
-    predictions = self.session.run([self.q_values], feed_dict={
-        self.states: observations, self.actions: actions})
-    return predictions
+    q_values, probabilities = self.session.run([self.q_values, self.probabilities],
+        feed_dict={
+          self.states: observations,
+          self.actions: actions,
+          })
+    return q_values, probabilities
 
   def cleanup(self):
     self.summary_writer.close()
@@ -93,6 +97,9 @@ class BagOfWordsModel:
     actions_output = _fully_connected_encoder(actions_input, self.actions_network)
 
     self.q_values = tf.tensordot(states_output, actions_output, axes=([1], [1]))
+    self.probabilities = self.q_values
+    if SOFTMAX_SCALING_FACTOR:
+      self.probabilities = tf.multinomial(self.q_values * SOFTMAX_SCALING_FACTOR, num_samples=1)
 
     self.loss = tf.reduce_sum(tf.square(self.labels - self.q_values))
     optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
