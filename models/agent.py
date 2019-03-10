@@ -1,10 +1,10 @@
-import spacy
 import random
+import spacy
 
 import numpy as np
 import tensorflow as tf
 
-from model import BagOfWordsModel#, ConcatenatedWordsModel
+from model import BagOfWordsModel
 from collections import namedtuple
 from util import words_to_ids, preproc, pad_sequences, max_len
 
@@ -18,7 +18,7 @@ RANDOM_SEED = 42
 EPSILON_START = 1.
 EPSILON_END = 0.01
 EPSILON_ANNEALING_INTERVAL = 300
-SHUFFLE_ACTIONS = False
+SHUFFLE_ACTIONS = True
 
 State = namedtuple(
     'State', [
@@ -95,16 +95,17 @@ class TrainableAgent(Agent):
             np.tile(
                 np.array(self._build_observation_ids(observation, info)),
                 (len(info["admissible_commands"]), 1)),
-            self._build_admissible_actions_ids(info))
+            self._build_admissible_actions_ids(info, shuffle=False))
         chosen_actions.append(info["admissible_commands"][np.argmax(probabilities)])
     return chosen_actions
 
   def add_state(self, observation, info, action, new_observation, new_info, reward, done):
     self.states.append(State(self._build_observation_ids(observation, info),
-                             self._build_admissible_actions_ids(info),
+                             self._build_admissible_actions_ids(info, shuffle=SHUFFLE_ACTIONS),
                              self._build_action_ids(action),
                              self._build_observation_ids(new_observation, new_info),
-                             self._build_admissible_actions_ids(new_info), reward, done))
+                             self._build_admissible_actions_ids(
+                               new_info, shuffle=SHUFFLE_ACTIONS), reward, done))
     return
 
   def get_model(self):
@@ -151,7 +152,7 @@ class TrainableAgent(Agent):
   def print_stats(self):
     all_states = State(*zip(*self.states))
     print('observation max length: {}, action max length: {}'.format(
-      max_len(all_states.observation_ids), max_len(all_states.action_ids)))
+        max_len(all_states.observation_ids), max_len(all_states.action_ids)))
 
   def _recent_memories(self):
     start = 0
@@ -181,14 +182,14 @@ class TrainableAgent(Agent):
     description_ids = words_to_ids(description_tokens, self.word_ids)
     return observation_ids + description_ids
 
-  def _build_admissible_actions_ids(self, info):
+  def _build_admissible_actions_ids(self, info, shuffle):
     admissible_actions_tokens = [preproc(admissible_action, tokenizer=self.nlp) for
                                  admissible_action in info['admissible_commands']]
     admissible_actions_ids = [words_to_ids(admissible_action_tokens, self.word_ids) for
                               admissible_action_tokens in admissible_actions_tokens]
     result = np.array(pad_sequences(
-      admissible_actions_ids, max_len=self.get_actions_padding_size()))
-    if SHUFFLE_ACTIONS:
+        admissible_actions_ids, max_len=self.get_actions_padding_size()))
+    if shuffle:
       np.random.shuffle(result)
     return result
 
@@ -196,6 +197,7 @@ class TrainableAgent(Agent):
     action_tokens = preproc(action, tokenizer=self.nlp)
     action_ids = words_to_ids(action_tokens, self.word_ids)
     return action_ids
+
 
 class BagOfWordsAgent(TrainableAgent):
 
