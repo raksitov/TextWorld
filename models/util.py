@@ -71,3 +71,29 @@ def pad_sequences(sequences, max_len=None, dtype='int32', value=0.):
     # post padding
     x[idx, :len(trunc)] = trunc
   return x
+
+
+def get_embeddings(config):
+  with open(config['glove_path']) as glove:
+    glove_vocab = {}
+    for vector in glove:
+      vector = vector.lstrip().rstrip().split(' ')
+      glove_vocab[vector[0]] = list(map(float, vector[1:]))
+  with open(config['vocab_path']) as vocab:
+    word_vocab = vocab.read().split('\n')
+
+  embedding_matrix = np.zeros((len(word_vocab), config['glove_dim']))
+  word_ids = {}
+  for idx, word in enumerate(word_vocab):
+    word_ids[word] = idx
+    if word not in glove_vocab:
+      if idx:
+        embedding_matrix[idx, :] = np.random.randn(config['glove_dim'])
+    else:
+      embedding_matrix[idx, :] = glove_vocab[word]
+
+  return embedding_matrix, word_ids
+
+
+def dict_to_array(d, size):
+  return [{k: v[idx] for (k, v) in d.items()} for idx in range(size)]
