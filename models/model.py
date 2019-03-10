@@ -12,12 +12,19 @@ LEARNING_RATE = 0.001
 STATES_NETWORK = [128, 16]
 ACTIONS_NETWORK = [16]
 SOFTMAX_SCALING_FACTOR = None
+DEBUG = False
 
+def _print_shape(tensor, message):
+  if DEBUG:
+    return tf.Print(tensor, [tf.shape(tensor)], message)
+  return tensor
 
-def _fully_connected_encoder(layer, network_structure):
-  last_layer = layers.fully_connected(layer, network_structure[0])
-  for i in range(1, len(network_structure)):
-    last_layer = layers.fully_connected(last_layer, network_structure[i])
+def _fully_connected_encoder(layer, network_structure, scope_name):
+  with tf.variable_scope(scope_name) as scope:
+    last_layer = layers.fully_connected(layer, network_structure[0])
+    for i in range(1, len(network_structure)):
+      last_layer = layers.fully_connected(last_layer, network_structure[i])
+  last_layer = _print_shape(last_layer, 'Fully connected shape ({}): '.format(scope_name))
   return last_layer
 
 
@@ -65,10 +72,10 @@ class BagOfWordsModel:
   def predict(self, observations, actions):
     #print('Predict: {}, {}'.format(observations.shape, actions.shape))
     q_values, probabilities = self.session.run([self.q_values, self.probabilities],
-        feed_dict={
-          self.states: observations,
-          self.actions: actions,
-          })
+                                               feed_dict={
+        self.states: observations,
+        self.actions: actions,
+    })
     return q_values, probabilities
 
   def cleanup(self):
@@ -89,12 +96,14 @@ class BagOfWordsModel:
     self.embedding_matrix = tf.constant(emb_matrix, tf.float32)
     self.states_embeddings = embedding_ops.embedding_lookup(self.embedding_matrix, self.states)
     self.actions_embeddings = embedding_ops.embedding_lookup(self.embedding_matrix, self.actions)
+    self.states_embeddings = _print_shape(self.states_embeddings, 'Embeddings shape (States): ')
+    self.actions_embeddings = _print_shape(self.actions_embeddings, 'Embeddings shape (Actions): ')
 
   def _build_network(self):
     states_input = tf.reduce_mean(self.states_embeddings, axis=1)
     actions_input = tf.reduce_mean(self.actions_embeddings, axis=1)
-    states_output = _fully_connected_encoder(states_input, self.states_network)
-    actions_output = _fully_connected_encoder(actions_input, self.actions_network)
+    states_output = _fully_connected_encoder(states_input, self.states_network, 'States')
+    actions_output = _fully_connected_encoder(actions_input, self.actions_network, 'Actions')
 
     self.q_values = tf.tensordot(states_output, actions_output, axes=([1], [1]))
     self.probabilities = self.q_values
