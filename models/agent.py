@@ -21,6 +21,62 @@ State = namedtuple(
         'done'])
 
 
+class ReplayMemory(object):
+
+  def __init__(self, capacity):
+    self.capacity = capacity
+    self.memory = []
+    self.position = 0
+    return
+
+  def push(self, state):
+    """Saves a transition."""
+    if len(self.memory) < self.capacity:
+      self.memory.append(None)
+    self.memory[self.position] = state
+    self.position = (self.position + 1) % self.capacity
+    return
+
+  def sample(self, batch_size):
+    if self.__len__() < batch_size:
+      return None
+    return random.sample(self.memory, batch_size)
+
+  def __len__(self):
+    return len(self.memory)
+
+
+class PrioritizedReplayMemory(object):
+
+  def __init__(self, capacity, priority_fraction):
+    self.priority_fraction = priority_fraction
+    self.alpha_memory = ReplayMemory(int(capacity * priority_fraction))
+    self.beta_memory = ReplayMemory(capacity - self.alpha_memory.capacity)
+    return
+
+  def push(self, state):
+    if self.priority_fraction > 0. and state.reward != 0:
+      self.alpha_memory.push(state)
+      return
+    self.beta_memory.push(state)
+    return
+
+  def sample(self, batch_size):
+    from_alpha = min(int(self.priority_fraction * batch_size), len(self.alpha_memory))
+    from_beta = min(batch_size - from_alpha, len(self.beta_memory))
+    if from_alpha + from_beta < batch_size:
+      return None
+    result = self.alpha_memory.sample(from_alpha) + self.beta_memory.sample(from_beta)
+    random.shuffle(result)
+    return result
+
+  def memory(self):
+    return self.alpha_memory.memory + self.beta_memory.memory
+
+  def __len__(self):
+    return len(self.alpha_memory) + len(self.beta_memory)
+
+
 class Agent():
 
   def choose_actions(self, observations, infos, dones):
@@ -55,7 +111,9 @@ class TrainableAgent(Agent):
   def __init__(self, config, embedding_matrix, word_ids):
     self.config = config['agent']
     self.word_ids = word_ids
-    self.states = []
+    self.replay_buffer = PrioritizedReplayMemory(
+        self.config['replay_memory_capacity'],
+        self.config['replay_memory_priority_fraction'])
     self.epsilon = self.config['epsilon_start']
     self.episode = 0
 
@@ -92,13 +150,16 @@ class TrainableAgent(Agent):
     return chosen_actions
 
   def add_state(self, observation, info, action, new_observation, new_info, reward, done):
-    self.states.append(State(self._build_observation_ids(observation, info),
-                             self._build_admissible_actions_ids(info,
-                               shuffle=self.config['shuffle_actions']),
-                             self._build_action_ids(action),
-                             self._build_observation_ids(new_observation, new_info),
-                             self._build_admissible_actions_ids(
-                               new_info, shuffle=self.config['shuffle_actions']), reward, done))
+    self.replay_buffer.push(State(
+        self._build_observation_ids(observation, info),
+        self._build_admissible_actions_ids(info, shuffle=self.config['shuffle_actions']),
+        self._build_action_ids(action),
+        self._build_observation_ids(new_observation, new_info),
+        self._build_admissible_actions_ids(
+            new_info,
+            shuffle=self.config['shuffle_actions']),
+        reward,
+        done))
     return
 
   def get_model(self):
@@ -111,7 +172,7 @@ class TrainableAgent(Agent):
     raise NotImplementedError
 
   def train(self):
-    batch = self._get_batch()
+    batch = self.replay_buffer.sample(self.config['training_batch_size'])
     if not batch:
       return
     observations_ids = []
@@ -134,8 +195,8 @@ class TrainableAgent(Agent):
     self.episode += 1
     if self.episode <= self.config['epsilon_annealing_interval']:
       self.epsilon -= ((self.config['epsilon_start'] - self.config['epsilon_end']) /
-          float(self.config['epsilon_annealing_interval']))
-    #self.print_stats()
+                       float(self.config['epsilon_annealing_interval']))
+    self.print_stats()
     return
 
   def cleanup(self):
@@ -144,21 +205,13 @@ class TrainableAgent(Agent):
     return
 
   def print_stats(self):
-    all_states = State(*zip(*self.states))
-    print('observation max length: {}, action max length: {}'.format(
-        max_len(all_states.observation_ids), max_len(all_states.action_ids)))
-
-  def _recent_memories(self):
-    start = 0
-    # TODO: replace with circular buffer.
-    if len(self.states) >= self.config['replay_memory_size']:
-      start = -self.config['replay_memory_size']
-    return self.states[start:]
-
-  def _get_batch(self):
-    if len(self.states) < self.config['training_batch_size']:
-      return None
-    return random.sample(self._recent_memories(), self.config['training_batch_size'])
+    all_states = State(*zip(*self.replay_buffer.memory()))
+    print('observation max length: {}, action max length: {}, rewards: {}'.format(
+        max_len(all_states.observation_ids),
+        max_len(all_states.action_ids),
+        sum(all_states.reward)))
+    print('alpha buffer: {}, beta buffer: {}'.format(
+        len(self.replay_buffer.alpha_memory), len(self.replay_buffer.beta_memory)))
 
   def _Q(self, sample):
     q_values, _ = self.model.predict(
@@ -166,7 +219,7 @@ class TrainableAgent(Agent):
             np.array(sample.new_observation_ids),
             (len(sample.new_admissible_actions_ids), 1)),
         sample.new_admissible_actions_ids)
-    #print('_Q: {}'.format(q_values))
+    # print('_Q: {}'.format(q_values))
     return np.max(q_values)
 
   def _build_observation_ids(self, observation, info):
