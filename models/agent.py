@@ -142,9 +142,7 @@ class TrainableAgent(Agent):
         chosen_actions.append(self.rng.choice(info['admissible_commands']))
       else:
         _, probabilities = self.model.predict(
-            np.tile(
-                np.array(self._build_observation_ids(observation, info)),
-                (len(info['admissible_commands']), 1)),
+            np.array(self._build_observation_ids(observation, info)).reshape(1, -1),
             self._build_admissible_actions_ids(info, shuffle=False))
         chosen_actions.append(info['admissible_commands'][np.argmax(probabilities)])
     return chosen_actions
@@ -215,9 +213,7 @@ class TrainableAgent(Agent):
 
   def _Q(self, sample):
     q_values, _ = self.model.predict(
-        np.tile(
-            np.array(sample.new_observation_ids),
-            (len(sample.new_admissible_actions_ids), 1)),
+        np.array(sample.new_observation_ids).reshape(1, -1),
         sample.new_admissible_actions_ids)
     # print('_Q: {}'.format(q_values))
     return np.max(q_values)
