@@ -102,6 +102,13 @@ class BagOfWordsModel:
     self.states_embeddings = _print_shape(self.states_embeddings, 'Embeddings shape (States): ')
     self.actions_embeddings = _print_shape(self.actions_embeddings, 'Embeddings shape (Actions): ')
 
+  def _get_loss(self):
+    if self.config['loss'] == 'mean_squared':
+      return tf.losses.mean_squared_error(self.labels, self.q_values)
+    elif self.config['loss'] == 'huber':
+      return tf.losses.huber_loss(self.labels, self.q_values)
+    return tf.reduce_sum(tf.square(self.labels - self.q_values))
+
   def _build_network(self):
     states_input = tf.reduce_mean(self.states_embeddings, axis=1)
     actions_input = tf.reduce_mean(self.actions_embeddings, axis=1)
@@ -121,7 +128,7 @@ class BagOfWordsModel:
 
     self.labels = _print_shape(self.labels, 'Labels shape: ')
     self.q_values = _print_shape(self.q_values, 'Q-values shape: ')
-    self.loss = tf.reduce_sum(tf.square(self.labels - self.q_values))
+    self.loss = self._get_loss()
     optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
     self.train_op = self._minimize(optimizer)
     return

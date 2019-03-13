@@ -24,3 +24,4 @@ model:
   states_network: [128, 16]
   actions_network: [16]
   softmax_scaling_factor: 0
+  loss: 'default'
