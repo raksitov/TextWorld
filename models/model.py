@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 
 import numpy as np
 import tensorflow as tf
@@ -17,7 +18,7 @@ def _print_shape(tensor, message):
 
 
 def _fully_connected_encoder(layer, network_structure, scope_name):
-  with tf.variable_scope(scope_name) as scope:
+  with tf.variable_scope(scope_name):
     last_layer = layers.fully_connected(layer, network_structure[0])
     for i in range(1, len(network_structure)):
       last_layer = layers.fully_connected(last_layer, network_structure[i])
@@ -31,6 +32,7 @@ class BagOfWordsModel:
     self.config = config['model']
     self.counter = 0
     self.session = session
+    self.last_time = time.time()
     with tf.variable_scope(scope):
       self.states = tf.placeholder(tf.int32, shape=(None, None))
       self.labels = tf.placeholder(tf.float32, shape=(None,))
@@ -49,7 +51,8 @@ class BagOfWordsModel:
 
   def train(self, observations, rewards, actions):
     #print('Train: {}'.format(rewards))
-    #print('Train: {}, {}, {}'.format(observations.shape, rewards.shape, actions.shape))
+    if DEBUG:
+      print('Train: {}, {}, {}'.format(observations.shape, rewards.shape, actions.shape))
     self.counter += 1
     summary, loss, _ = self.session.run(
         [self.merged_summary, self.loss, self.train_op],
@@ -62,7 +65,10 @@ class BagOfWordsModel:
       if self.counter % 10 == 0:
         self.summary_writer.add_summary(summary, self.counter)
       if self.counter % 100 == 0:
-        print('Batch: {}, loss: {}'.format(self.counter, loss))
+        current_time = time.time()
+        print('Batch: {}, loss: {:0.2f}, elapsed: {:0.2f}'.format(
+            self.counter, loss, current_time - self.last_time))
+        self.last_time = current_time
     return
 
   def predict(self, observations, actions):
@@ -109,6 +115,8 @@ class BagOfWordsModel:
       self.probabilities = tf.multinomial(
           self.q_values * self.config['softmax_scaling_factor'], num_samples=1)
 
+    self.labels = _print_shape(self.labels, 'Labels shape: ')
+    self.q_values = _print_shape(self.q_values, 'Q-values shape: ')
     self.loss = tf.reduce_sum(tf.square(self.labels - self.q_values))
     optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
     self.train_op = self._minimize(optimizer)
