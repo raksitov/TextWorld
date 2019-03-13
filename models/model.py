@@ -109,11 +109,15 @@ class BagOfWordsModel:
     actions_output = _fully_connected_encoder(
         actions_input, self.config['actions_network'], 'Actions')
 
-    self.q_values = tf.tensordot(states_output, actions_output, axes=([1], [1]))
+    self.q_values = tf.reduce_sum(states_output * actions_output, axis=1)
     self.probabilities = self.q_values
     if self.config['softmax_scaling_factor']:
       self.probabilities = tf.multinomial(
-          self.q_values * self.config['softmax_scaling_factor'], num_samples=1)
+          tf.reshape(
+              self.q_values,
+              (-1,
+               1)) * self.config['softmax_scaling_factor'],
+          num_samples=1)
 
     self.labels = _print_shape(self.labels, 'Labels shape: ')
     self.q_values = _print_shape(self.q_values, 'Q-values shape: ')
