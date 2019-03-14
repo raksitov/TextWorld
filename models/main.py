@@ -19,6 +19,7 @@ CONFIG = 'config.yaml'
 
 def train(env, agent, config):
   max_reward = 0
+  max_mean_rewards = 0
   for episode in tqdm.tqdm(range(config['episodes'])):
     observations, infos = env.reset()
     infos_array = dict_to_array(infos, config['environment_batch_size'])
@@ -48,8 +49,9 @@ def train(env, agent, config):
         agent.train()
       step += 1
     max_reward = max(max_reward, max(rewards))
-    print('Rewards: {}, steps: {}, max: {}'.format(
-        np.mean(rewards), step, max_reward))
+    max_mean_rewards = max(max_mean_rewards, np.mean(rewards))
+    print('Mean rewards: {}, steps: {}, max reward: {}, max mean rewards: {}'.format(
+        np.mean(rewards), step, max_reward, max_mean_rewards))
     agent.end_episode()
 
   agent.cleanup()
