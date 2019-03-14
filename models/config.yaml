@@ -11,10 +11,11 @@ agent:
   summary_dir: 'Summaries'
   gamma: 0.5
   training_batch_size: 20
-  replay_memory_size: 10000
+  replay_memory_capacity: 10000
+  replay_memory_priority_fraction: 0.25
   random_seed: 42
   epsilon_start: 1.
-  epsilon_end: 0.01
+  epsilon_end: 0.2
   epsilon_annealing_interval: 300
   shuffle_actions: True
 

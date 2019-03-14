@@ -1,80 +1,13 @@
-import random
 import spacy
 
 import numpy as np
 import tensorflow as tf
 
 from model import BagOfWordsModel
-from collections import namedtuple
-from util import words_to_ids, preproc, pad_sequences, max_len
+from util import words_to_ids, preproc, pad_sequences
+from replay_memory import State, RecentAndPrioritizedReplayMemory
 
 from numpy.random import RandomState
-
-State = namedtuple(
-    'State', [
-        'observation_ids',
-        'admissible_actions_ids',
-        'action_ids',
-        'new_observation_ids',
-        'new_admissible_actions_ids',
-        'reward',
-        'done'])
-
-
-class ReplayMemory(object):
-
-  def __init__(self, capacity):
-    self.capacity = capacity
-    self.memory = []
-    self.position = 0
-    return
-
-  def push(self, state):
-    """Saves a transition."""
-    if len(self.memory) < self.capacity:
-      self.memory.append(None)
-    self.memory[self.position] = state
-    self.position = (self.position + 1) % self.capacity
-    return
-
-  def sample(self, batch_size):
-    if self.__len__() < batch_size:
-      return None
-    return random.sample(self.memory, batch_size)
-
-  def __len__(self):
-    return len(self.memory)
-
-
-class PrioritizedReplayMemory(object):
-
-  def __init__(self, capacity, priority_fraction):
-    self.priority_fraction = priority_fraction
-    self.alpha_memory = ReplayMemory(int(capacity * priority_fraction))
-    self.beta_memory = ReplayMemory(capacity - self.alpha_memory.capacity)
-    return
-
-  def push(self, state):
-    if self.priority_fraction > 0. and state.reward != 0:
-      self.alpha_memory.push(state)
-      return
-    self.beta_memory.push(state)
-    return
-
-  def sample(self, batch_size):
-    from_alpha = min(int(self.priority_fraction * batch_size), len(self.alpha_memory))
-    from_beta = min(batch_size - from_alpha, len(self.beta_memory))
-    if from_alpha + from_beta < batch_size:
-      return None
-    result = self.alpha_memory.sample(from_alpha) + self.beta_memory.sample(from_beta)
-    random.shuffle(result)
-    return result
-
-  def memory(self):
-    return self.alpha_memory.memory + self.beta_memory.memory
-
-  def __len__(self):
-    return len(self.alpha_memory) + len(self.beta_memory)
 
 
 class Agent():
@@ -111,7 +44,7 @@ class TrainableAgent(Agent):
   def __init__(self, config, embedding_matrix, word_ids):
     self.config = config['agent']
     self.word_ids = word_ids
-    self.replay_buffer = PrioritizedReplayMemory(
+    self.replay_buffer = RecentAndPrioritizedReplayMemory(
         self.config['replay_memory_capacity'],
         self.config['replay_memory_priority_fraction'])
     self.epsilon = self.config['epsilon_start']
@@ -194,22 +127,13 @@ class TrainableAgent(Agent):
     if self.episode <= self.config['epsilon_annealing_interval']:
       self.epsilon -= ((self.config['epsilon_start'] - self.config['epsilon_end']) /
                        float(self.config['epsilon_annealing_interval']))
-    self.print_stats()
+    self.replay_buffer.end_episode()
     return
 
   def cleanup(self):
     self.model.cleanup()
     self.session.close()
     return
-
-  def print_stats(self):
-    all_states = State(*zip(*self.replay_buffer.memory()))
-    print('observation max length: {}, action max length: {}, rewards: {}'.format(
-        max_len(all_states.observation_ids),
-        max_len(all_states.action_ids),
-        sum(all_states.reward)))
-    print('alpha buffer: {}, beta buffer: {}'.format(
-        len(self.replay_buffer.alpha_memory), len(self.replay_buffer.beta_memory)))
 
   def _Q(self, sample):
     q_values, _ = self.model.predict(
