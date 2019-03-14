@@ -145,9 +145,14 @@ class TrainableAgent(Agent):
   def _build_observation_ids(self, observation, info):
     observation_tokens = preproc(observation, str_type='feedback', tokenizer=self.nlp)
     observation_ids = words_to_ids(observation_tokens, self.word_ids)
+
     description_tokens = preproc(info['description'], tokenizer=self.nlp)
     description_ids = words_to_ids(description_tokens, self.word_ids)
-    return observation_ids + description_ids
+
+    inventory_tokens = preproc(info['inventory'], tokenizer=self.nlp)
+    inventory_ids = words_to_ids(inventory_tokens, self.word_ids)
+
+    return observation_ids + description_ids + inventory_ids
 
   def _build_admissible_actions_ids(self, info, shuffle):
     admissible_actions_tokens = [preproc(admissible_action, tokenizer=self.nlp) for

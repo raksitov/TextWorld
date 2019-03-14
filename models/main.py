@@ -70,6 +70,7 @@ def main():
       description=True,
       has_lost=True,
       has_won=True,
+      inventory=True,
       max_score=True,
   )
   env_id = textworld.gym.register_games([gamefile], requested_infos)
