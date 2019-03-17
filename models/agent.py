@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 from model import BagOfWordsModel
-from util import words_to_ids, preproc, pad_sequences
+from util import memoized_string_to_ids, pad_sequences
 from replay_memory import State, RecentAndPrioritizedReplayMemory
 
 from numpy.random import RandomState
@@ -143,22 +143,23 @@ class TrainableAgent(Agent):
     return np.max(q_values)
 
   def _build_observation_ids(self, observation, info):
-    observation_tokens = preproc(observation, str_type='feedback', tokenizer=self.nlp)
-    observation_ids = words_to_ids(observation_tokens, self.word_ids)
+    observation_ids = memoized_string_to_ids(
+        observation, self.word_ids, str_type='feedback', tokenizer=self.nlp)
 
-    description_tokens = preproc(info['description'], tokenizer=self.nlp)
-    description_ids = words_to_ids(description_tokens, self.word_ids)
+    description_ids = memoized_string_to_ids(
+        info['description'], self.word_ids, tokenizer=self.nlp)
 
-    inventory_tokens = preproc(info['inventory'], tokenizer=self.nlp)
-    inventory_ids = words_to_ids(inventory_tokens, self.word_ids)
-
+    inventory_ids = memoized_string_to_ids(
+        info['inventory'], self.word_ids, tokenizer=self.nlp)
     return observation_ids + description_ids + inventory_ids
 
   def _build_admissible_actions_ids(self, info, shuffle):
-    admissible_actions_tokens = [preproc(admissible_action, tokenizer=self.nlp) for
-                                 admissible_action in info['admissible_commands']]
-    admissible_actions_ids = [words_to_ids(admissible_action_tokens, self.word_ids) for
-                              admissible_action_tokens in admissible_actions_tokens]
+    admissible_actions_ids = [
+        memoized_string_to_ids(
+            admissible_action,
+            self.word_ids,
+            tokenizer=self.nlp) for admissible_action in info['admissible_commands']]
+
     result = np.array(pad_sequences(
         admissible_actions_ids, max_len=self.get_actions_padding_size()))
     if shuffle:
@@ -166,8 +167,7 @@ class TrainableAgent(Agent):
     return result
 
   def _build_action_ids(self, action):
-    action_tokens = preproc(action, tokenizer=self.nlp)
-    action_ids = words_to_ids(action_tokens, self.word_ids)
+    action_ids = memoized_string_to_ids(action, self.word_ids, tokenizer=self.nlp)
     return action_ids
 
 

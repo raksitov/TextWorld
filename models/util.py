@@ -31,6 +31,25 @@ def preproc(s, str_type='None', tokenizer=None, lower_case=True):
   return tokens
 
 
+def static_var(varname, value):
+  def decorate(func):
+    setattr(func, varname, value)
+    return func
+  return decorate
+
+
+@static_var('memo', {})
+def memoized_string_to_ids(s, word_ids, str_type='None', tokenizer=None, lower_case=True):
+  if str_type not in memoized_string_to_ids.memo:
+    memoized_string_to_ids.memo[str_type] = {}
+  if s in memoized_string_to_ids.memo[str_type]:
+    return memoized_string_to_ids.memo[str_type][s]
+  tokens = preproc(s, str_type, tokenizer, lower_case)
+  ids = words_to_ids(tokens, word_ids)
+  memoized_string_to_ids.memo[str_type][s] = ids
+  return ids
+
+
 def max_len(list_of_list):
   return max(map(len, list_of_list))
 
