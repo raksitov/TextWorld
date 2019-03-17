@@ -26,7 +26,7 @@ def train(env, agent, config):
     rewards = [0] * config['environment_batch_size']
     dones = [False] * config['environment_batch_size']
 
-    step = 0
+    steps = 0
     # TODO: maybe condition on max_steps as well.
     while not all(dones):
       actions = agent.choose_actions(observations, infos_array, dones)
@@ -45,13 +45,16 @@ def train(env, agent, config):
       infos_array = new_infos_array
       rewards = new_rewards
       dones = new_dones
-      if step % config['update_frequency'] == 0:
+      if steps % config['update_frequency'] == 0:
         agent.train()
-      step += 1
+      steps += 1
+    mean_rewards = np.mean(rewards)
     max_reward = max(max_reward, max(rewards))
     max_mean_rewards = max(max_mean_rewards, np.mean(rewards))
-    print('Mean rewards: {}, steps: {}, max reward: {}, max mean rewards: {}'.format(
-        np.mean(rewards), step, max_reward, max_mean_rewards))
+    max_score = max([info['max_score'] for info in infos_array])
+    wins_percentage = sum([info['has_won'] for info in infos_array]) * 100. / len(infos_array)
+    print('Mean rewards: {}({}), steps: {}, max reward: {}({}), wins percentage - {}'.format(
+        mean_rewards, max_mean_rewards, steps, max_reward, max_score, wins_percentage))
     agent.end_episode()
 
   agent.cleanup()
@@ -65,7 +68,7 @@ def main():
   print('Found {} games.'.format(len(gamefiles)))
   # pprint(gamefiles)
   # Pick a game.
-  gamefile = gamefiles[4]
+  gamefile = gamefiles[1]
 
   requested_infos = EnvInfos(
       admissible_commands=True,
