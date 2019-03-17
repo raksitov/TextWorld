@@ -44,8 +44,7 @@ class RNNEncoder(object):
     elif cell_type == 'lstm':
       return rnn_cell.LSTMCell(self.hidden_size)
     elif cell_type == 'layer_norm':
-      return LayerNormBasicLSTMCell(self.hidden_size,
-                                    dropout_keep_prob=keep_prob)
+      return LayerNormBasicLSTMCell(self.hidden_size, dropout_keep_prob=keep_prob)
     else:
       raise Exception('Unknown cell type: {}'.format(cell_type))
 
@@ -161,19 +160,19 @@ class Model:
   def _build_network(self):
     if self.config['state_encoder'] == 'rnn':
       rnn_encoder = RNNEncoder(hidden_size=self.config['actions_network'][-1],
-          keep_prob=self.config['keep_prob']),
-          cell_type = self.config['rnn_cell'])
+                               keep_prob=self.config['keep_prob'],
+                               cell_type=self.config['rnn_cell'])
       # (batch_size, states_len, hidden_size)
-      states_output, _=rnn_encoder.build_graph(
+      states_output, _ = rnn_encoder.build_graph(
           self.states_embeddings, self.states_mask)
-      states_output=states_output[:, -1, :]
+      states_output = states_output[:, -1, :]
     else:
-      states_input=tf.reduce_mean(self.states_embeddings, axis = 1)
-      states_output=_fully_connected_encoder(
+      states_input = tf.reduce_mean(self.states_embeddings, axis=1)
+      states_output = _fully_connected_encoder(
           states_input, self.config['states_network'], 'States')
 
-    actions_input=tf.reduce_mean(self.actions_embeddings, axis = 1)
-    actions_output=_fully_connected_encoder(
+    actions_input = tf.reduce_mean(self.actions_embeddings, axis=1)
+    actions_output = _fully_connected_encoder(
         actions_input, self.config['actions_network'], 'Actions')
 
     self.q_values = tf.reduce_sum(states_output * actions_output, axis=1)
