@@ -6,7 +6,10 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow.python.ops import embedding_ops
+from tensorflow.python.ops.rnn_cell import DropoutWrapper
+from tensorflow.python.ops import rnn_cell
 from tensorflow.contrib import layers
+from tensorflow.contrib.rnn import LayerNormBasicLSTMCell
 
 DEBUG = False
 
@@ -26,7 +29,49 @@ def _fully_connected_encoder(layer, network_structure, scope_name):
   return last_layer
 
 
-class BagOfWordsModel:
+class RNNEncoder(object):
+
+  def __init__(self, hidden_size, keep_prob, cell_type='gru', scope='RNNEncoder'):
+
+    self.hidden_size = hidden_size
+    self.keep_prob = keep_prob
+    self.rnn_cell = self._dropout()
+    self.scope = scope
+
+  def _get_cell(self):
+    if cell_type == 'gru':
+      return rnn_cell.GRUCell(self.hidden_size)
+    elif cell_type == 'lstm':
+      return rnn_cell.LSTMCell(self.hidden_size)
+    elif cell_type == 'layer_norm':
+      return LayerNormBasicLSTMCell(self.hidden_size,
+                                    dropout_keep_prob=keep_prob)
+    else:
+      raise Exception('Unknown cell type: {}'.format(cell_type))
+
+  def _dropout(self):
+    return DropoutWrapper(self._get_cell(), input_keep_prob=self.keep_prob)
+
+  def build_graph(self, inputs, masks=None, initial_states=None):
+
+    with tf.variable_scope(self.scope):
+      input_lens = None
+      if masks is not None:
+        input_lens = tf.reduce_sum(masks, reduction_indices=1)
+
+      outputs, output_state = tf.nn.dynamic_rnn(
+          self.rnn_cell,
+          inputs,
+          initial_state=initial_states,
+          sequence_length=input_lens,
+          dtype=tf.float32)
+
+      outputs = tf.nn.dropout(outputs, self.keep_prob)
+
+      return outputs, output_state
+
+
+class Model:
 
   def __init__(self, config, session, scope, embedding_matrix, summaries_dir=None):
     self.config = config['model']
@@ -35,6 +80,7 @@ class BagOfWordsModel:
     self.last_time = time.time()
     with tf.variable_scope(scope):
       self.states = tf.placeholder(tf.int32, shape=(None, None))
+      self.states_mask = tf.placeholder(tf.int32, shape=(None, None))
       self.labels = tf.placeholder(tf.float32, shape=(None,))
       self.actions = tf.placeholder(tf.int32, shape=(None, None))
       self.learning_rate = tf.placeholder_with_default(self.config['learning_rate'], shape=())
@@ -51,7 +97,7 @@ class BagOfWordsModel:
     return
 
   def train(self, observations, rewards, actions):
-    #print('Train: {}'.format(rewards))
+    # print('Train: {}'.format(rewards))
     if DEBUG:
       print('Train: {}, {}, {}'.format(observations.shape, rewards.shape, actions.shape))
     self.counter += 1
@@ -59,6 +105,7 @@ class BagOfWordsModel:
         [self.merged_summary, self.loss, self.gradients_norm, self.train_op],
         feed_dict={
             self.states: observations,
+            self.states_mask: (observations != 0).astype(np.int32),
             self.labels: rewards,
             self.actions: actions,
         })
@@ -73,11 +120,12 @@ class BagOfWordsModel:
     return
 
   def predict(self, observations, actions):
-    #print('Predict: {}, {}'.format(observations.shape, actions.shape))
+    # print('Predict: {}, {}'.format(observations.shape, actions.shape))
     q_values, probabilities = self.session.run(
         [self.q_values, self.probabilities],
         feed_dict={
             self.states: observations,
+            self.states_mask: (observations != 0).astype(np.int32),
             self.actions: actions,
         })
     return q_values, probabilities
@@ -111,10 +159,21 @@ class BagOfWordsModel:
     return tf.reduce_sum(tf.square(self.labels - self.q_values))
 
   def _build_network(self):
-    states_input = tf.reduce_mean(self.states_embeddings, axis=1)
-    actions_input = tf.reduce_mean(self.actions_embeddings, axis=1)
-    states_output = _fully_connected_encoder(states_input, self.config['states_network'], 'States')
-    actions_output = _fully_connected_encoder(
+    if self.config['state_encoder'] == 'rnn':
+      rnn_encoder = RNNEncoder(hidden_size=self.config['actions_network'][-1],
+          keep_prob=self.config['keep_prob']),
+          cell_type = self.config['rnn_cell'])
+      # (batch_size, states_len, hidden_size)
+      states_output, _=rnn_encoder.build_graph(
+          self.states_embeddings, self.states_mask)
+      states_output=states_output[:, -1, :]
+    else:
+      states_input=tf.reduce_mean(self.states_embeddings, axis = 1)
+      states_output=_fully_connected_encoder(
+          states_input, self.config['states_network'], 'States')
+
+    actions_input=tf.reduce_mean(self.actions_embeddings, axis = 1)
+    actions_output=_fully_connected_encoder(
         actions_input, self.config['actions_network'], 'Actions')
 
     self.q_values = tf.reduce_sum(states_output * actions_output, axis=1)

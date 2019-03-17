@@ -3,7 +3,7 @@ import spacy
 import numpy as np
 import tensorflow as tf
 
-from model import BagOfWordsModel
+from model import Model
 from util import memoized_string_to_ids, pad_sequences
 from replay_memory import State, RecentAndPrioritizedReplayMemory
 
@@ -171,10 +171,10 @@ class TrainableAgent(Agent):
     return action_ids
 
 
-class BagOfWordsAgent(TrainableAgent):
+class CustomizableAgent(TrainableAgent):
 
   def get_model(self):
-    return BagOfWordsModel
+    return Model
 
   def get_observation_padding_size(self):
     return None
