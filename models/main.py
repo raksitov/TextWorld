@@ -88,7 +88,7 @@ def main():
       batch_size=config['main']['environment_batch_size'],
       parallel=True)
   env = gym.make(env_id)
-  agent = BagOfWordsAgent(config, *get_embeddings(config['main']))
+  agent = CustomizableAgent(config, *get_embeddings(config['main']))
   train(env, agent, config['main'])
   return
 
