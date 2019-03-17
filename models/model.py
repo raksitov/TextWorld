@@ -35,18 +35,19 @@ class RNNEncoder(object):
 
     self.hidden_size = hidden_size
     self.keep_prob = keep_prob
+    self.cell_type = cell_type
     self.rnn_cell = self._dropout()
     self.scope = scope
 
   def _get_cell(self):
-    if cell_type == 'gru':
+    if self.cell_type == 'gru':
       return rnn_cell.GRUCell(self.hidden_size)
-    elif cell_type == 'lstm':
+    elif self.cell_type == 'lstm':
       return rnn_cell.LSTMCell(self.hidden_size)
-    elif cell_type == 'layer_norm':
-      return LayerNormBasicLSTMCell(self.hidden_size, dropout_keep_prob=keep_prob)
+    elif self.cell_type == 'layer_norm':
+      return LayerNormBasicLSTMCell(self.hidden_size, dropout_keep_prob=self.keep_prob)
     else:
-      raise Exception('Unknown cell type: {}'.format(cell_type))
+      raise Exception('Unknown cell type: {}'.format(self.cell_type))
 
   def _dropout(self):
     return DropoutWrapper(self._get_cell(), input_keep_prob=self.keep_prob)
