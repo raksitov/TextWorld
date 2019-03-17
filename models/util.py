@@ -93,23 +93,25 @@ def pad_sequences(sequences, max_len=None, dtype='int32', value=0.):
 
 
 def get_embeddings(config):
-  with open(config['glove_path']) as glove:
-    glove_vocab = {}
-    for vector in glove:
-      vector = vector.lstrip().rstrip().split(' ')
-      glove_vocab[vector[0]] = list(map(float, vector[1:]))
+  pretrained_vocab = {}
+  if config['use_pretrained']:
+    with open(config['pretrained_path']) as pretrained:
+      for vector in pretrained:
+        vector = vector.lstrip().rstrip().split(' ')
+        pretrained_vocab[vector[0]] = list(map(float, vector[1:]))
   with open(config['vocab_path']) as vocab:
     word_vocab = vocab.read().split('\n')
 
-  embedding_matrix = np.zeros((len(word_vocab), config['glove_dim']))
+  embedding_matrix = np.zeros((len(word_vocab), config['embedding_dim']))
   word_ids = {}
   for idx, word in enumerate(word_vocab):
     word_ids[word] = idx
-    if word not in glove_vocab:
+    if word not in pretrained_vocab:
       if idx:
-        embedding_matrix[idx, :] = np.random.randn(config['glove_dim'])
+        embedding_matrix[idx, :] = np.random.randn(
+            config['embedding_dim']) * config['embedding_dim']**(-0.5)
     else:
-      embedding_matrix[idx, :] = glove_vocab[word]
+      embedding_matrix[idx, :] = pretrained_vocab[word]
 
   return embedding_matrix, word_ids
 

@@ -12,6 +12,7 @@ from tensorflow.contrib import layers
 from tensorflow.contrib.rnn import LayerNormBasicLSTMCell
 
 DEBUG = False
+EMBEDDINGS_NAME = 'Embeddings'
 
 
 def _print_shape(tensor, message):
@@ -136,7 +137,9 @@ class Model:
 
   def _minimize(self, optimizer):
     gradients = optimizer.compute_gradients(self.loss)
-    self.gradients_norm = tf.global_norm(gradients)
+    dense_gradients = [
+        gradient for gradient in gradients if gradient[1].name.find(EMBEDDINGS_NAME) == -1]
+    self.gradients_norm = tf.global_norm(dense_gradients)
     if self.config['clip_by_norm']:
       for i, (gradient, variable) in enumerate(gradients):
         if gradient is not None:
@@ -145,7 +148,12 @@ class Model:
 
   def _add_embedding_layer(self, emb_matrix):
     # Note: the embedding matrix is a tf.constant which means it's not a trainable parameter
-    self.embedding_matrix = tf.constant(emb_matrix, tf.float32)
+    embedding_matrix_init = tf.constant(emb_matrix, tf.float32)
+    self.embedding_matrix = tf.get_variable(
+        name=EMBEDDINGS_NAME,
+        dtype=tf.float32,
+        initializer=embedding_matrix_init)
+
     self.states_embeddings = embedding_ops.embedding_lookup(self.embedding_matrix, self.states)
     self.actions_embeddings = embedding_ops.embedding_lookup(self.embedding_matrix, self.actions)
     self.states_embeddings = _print_shape(self.states_embeddings, 'Embeddings shape (States): ')

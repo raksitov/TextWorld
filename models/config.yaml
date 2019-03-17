@@ -2,8 +2,9 @@ main:
   episodes: 1000
   games_path: '../sample_games'
   vocab_path: '../vocab.txt'
-  glove_path: '../glove.6B.50d.txt'
-  glove_dim: 50
+  pretrained_path: '../glove.6B.50d.txt'
+  use_pretrained: False
+  embedding_dim: 50
   environment_batch_size: 10
   update_frequency: 1
 
