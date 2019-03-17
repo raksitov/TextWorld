@@ -1,8 +1,8 @@
 main:
   episodes: 1000
-  games_path: '/home/renat/WorkingDir/cs230/TextWorld/sample_games'
-  vocab_path: '/home/renat/WorkingDir/cs230/TextWorld/vocab.txt'
-  glove_path: '/home/renat/WorkingDir/cs224n/squad/data/glove.6B.50d.txt'
+  games_path: '../sample_games'
+  vocab_path: '../vocab.txt'
+  glove_path: '../glove.6B.50d.txt'
   glove_dim: 50
   environment_batch_size: 10
   update_frequency: 1
