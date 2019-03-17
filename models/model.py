@@ -43,6 +43,7 @@ class BagOfWordsModel:
       self._build_network()
       if summaries_dir is not None:
         tf.summary.scalar('loss', self.loss)
+        tf.summary.scalar('gradients norm', self.gradients_norm)
         self.merged_summary = tf.summary.merge_all()
         if os.path.exists(summaries_dir):
           shutil.rmtree(summaries_dir)
@@ -54,8 +55,8 @@ class BagOfWordsModel:
     if DEBUG:
       print('Train: {}, {}, {}'.format(observations.shape, rewards.shape, actions.shape))
     self.counter += 1
-    summary, loss, _ = self.session.run(
-        [self.merged_summary, self.loss, self.train_op],
+    summary, loss, gradients_norm, _ = self.session.run(
+        [self.merged_summary, self.loss, self.gradients_norm, self.train_op],
         feed_dict={
             self.states: observations,
             self.labels: rewards,
@@ -66,8 +67,8 @@ class BagOfWordsModel:
         self.summary_writer.add_summary(summary, self.counter)
       if self.counter % 100 == 0:
         current_time = time.time()
-        print('Batch: {}, loss: {:0.2f}, elapsed: {:0.2f}'.format(
-            self.counter, loss, current_time - self.last_time))
+        print('Batch: {}, loss: {:0.2f}, gradients norm: {:0.2f}, elapsed: {:0.2f}'.format(
+            self.counter, loss, gradients_norm, current_time - self.last_time))
         self.last_time = current_time
     return
 
@@ -86,13 +87,13 @@ class BagOfWordsModel:
     return
 
   def _minimize(self, optimizer):
+    gradients = optimizer.compute_gradients(self.loss)
+    self.gradients_norm = tf.global_norm(gradients)
     if self.config['clip_by_norm']:
-      gradients = optimizer.compute_gradients(self.loss)
       for i, (gradient, variable) in enumerate(gradients):
         if gradient is not None:
           gradients[i] = (tf.clip_by_norm(gradient, self.config['clip_by_norm']), variable)
-      return optimizer.apply_gradients(gradients)
-    return optimizer.minimize(self.loss)
+    return optimizer.apply_gradients(gradients)
 
   def _add_embedding_layer(self, emb_matrix):
     # Note: the embedding matrix is a tf.constant which means it's not a trainable parameter
