@@ -19,6 +19,7 @@ agent:
   epsilon_end: 0.1
   epsilon_annealing_interval: 300
   shuffle_actions: True
+  batch_oneshot: True
 
 model:
   clip_by_norm: 5.
@@ -29,4 +30,4 @@ model:
   loss: 'default'
   state_encoder: 'rnn'
   rnn_cell: 'gru'
-  keep_prob: 1.
+  keep_prob: 0.9

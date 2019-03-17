@@ -106,16 +106,10 @@ class TrainableAgent(Agent):
     batch = self.replay_buffer.sample(self.config['training_batch_size'])
     if not batch:
       return
-    observations_ids = []
-    rewards = []
-    actions_ids = []
-    for sample in batch:
-      observations_ids.append(sample.observation_ids)
-      reward = sample.reward
-      if not sample.done:
-        reward += self.config['gamma'] * self._Q(sample)
-      rewards.append(reward)
-      actions_ids.append(sample.action_ids)
+    if self.config['batch_oneshot']:
+      observations_ids, rewards, actions_ids = self._preprocess_batch_oneshot(batch)
+    else:
+      observations_ids, rewards, actions_ids = self._preprocess_batch(batch)
     self.model.train(
         np.stack(pad_sequences(observations_ids, max_len=self.get_observation_padding_size())),
         np.stack(rewards),
@@ -134,6 +128,59 @@ class TrainableAgent(Agent):
     self.model.cleanup()
     self.session.close()
     return
+
+  def _preprocess_batch(self, batch):
+    observations_ids = []
+    rewards = []
+    actions_ids = []
+    for sample in batch:
+      observations_ids.append(sample.observation_ids)
+      reward = sample.reward
+      if not sample.done:
+        reward += self.config['gamma'] * self._Q(sample)
+      rewards.append(reward)
+      actions_ids.append(sample.action_ids)
+    return observations_ids, rewards, actions_ids
+
+  def _preprocess_batch_oneshot(self, batch):
+    observations_ids = []
+    rewards = []
+    actions_ids = []
+    for idx, sample in enumerate(batch):
+      observations_ids.append(sample.observation_ids)
+      rewards.append(sample.reward)
+      actions_ids.append(sample.action_ids)
+
+    q_values, idx_mapping = self._Q_oneshot(batch)
+    for idx, sample in enumerate(batch):
+      if not sample.done:
+        (start, end) = idx_mapping[idx]
+        rewards[idx] += self.config['gamma'] * np.max(q_values[start: end])
+    return observations_ids, rewards, actions_ids
+
+  def _Q_oneshot(self, batch):
+    new_observations_ids = []
+    new_admissible_actions_ids = []
+    observation_padding_size = 0
+    idx_mapping = {}
+    current_idx = 0
+    for idx, sample in enumerate(batch):
+      if sample.done:
+        continue
+      new_observations_ids.append(sample.new_observation_ids)
+      new_admissible_actions_ids.append(sample.new_admissible_actions_ids)
+      observation_padding_size = max(observation_padding_size, len(sample.new_observation_ids))
+      idx_mapping[idx] = (current_idx, current_idx + len(sample.new_admissible_actions_ids))
+      current_idx += len(sample.new_admissible_actions_ids)
+
+    new_observations_ids = pad_sequences(new_observations_ids, max_len=observation_padding_size)
+    new_tiled_observations = []
+    for idx, observation in enumerate(new_observations_ids):
+      num_actions = len(new_admissible_actions_ids[idx])
+      new_tiled_observations.append(np.tile(observation, (num_actions, 1)))
+    q_values, _ = self.model.predict(np.concatenate(new_tiled_observations),
+                                     np.concatenate(new_admissible_actions_ids))
+    return q_values, idx_mapping
 
   def _Q(self, sample):
     q_values, _ = self.model.predict(
@@ -180,4 +227,4 @@ class CustomizableAgent(TrainableAgent):
     return None
 
   def get_actions_padding_size(self):
-    return None
+    return 10
