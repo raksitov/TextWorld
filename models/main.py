@@ -69,11 +69,18 @@ def main():
 
   requested_infos = EnvInfos(
       admissible_commands=True,
+      command_templates=True,
       description=True,
+      entities=True,
       has_lost=True,
       has_won=True,
       inventory=True,
       max_score=True,
+      objective=True,
+      verbs=True,
+      extras=[
+          "recipe",
+      ],
   )
   env_id = textworld.gym.register_games([gamefile], requested_infos)
   env_id = textworld.gym.make_batch(
