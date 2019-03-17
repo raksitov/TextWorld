@@ -6,7 +6,7 @@ import yaml
 
 import numpy as np
 
-from agent import RandomAgent, BagOfWordsAgent
+from agent import RandomAgent, CustomizableAgent
 from glob import glob
 from pprint import pprint
 from textworld import EnvInfos
