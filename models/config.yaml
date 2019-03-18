@@ -17,7 +17,7 @@ agent:
   random_seed: 42
   epsilon_start: 1.
   epsilon_end: 0.1
-  epsilon_annealing_interval: 300
+  epsilon_annealing_interval: 900
   shuffle_actions: True
   batch_oneshot: True
 
@@ -29,5 +29,5 @@ model:
   softmax_scaling_factor: 0
   loss: 'default'
   state_encoder: 'rnn'
-  rnn_cell: 'gru'
+  rnn_cell: 'lstm'
   keep_prob: 0.9
