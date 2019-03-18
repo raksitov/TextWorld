@@ -23,6 +23,7 @@ agent:
 
 model:
   clip_by_norm: 5.
+  optimizer: 'default'
   learning_rate: 0.001
   states_network: [128, 16]
   actions_network: [16]

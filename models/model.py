@@ -195,6 +195,9 @@ class Model:
     self.labels = _print_shape(self.labels, 'Labels shape: ')
     self.q_values = _print_shape(self.q_values, 'Q-values shape: ')
     self.loss = self._get_loss()
-    optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+    if self.config['optimizer'] == 'rmsprop':
+      optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate)
+    else:
+      optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
     self.train_op = self._minimize(optimizer)
     return
