@@ -198,7 +198,10 @@ class TrainableAgent(Agent):
 
     inventory_ids = memoized_string_to_ids(
         info['inventory'], self.word_ids, tokenizer=self.nlp)
-    return observation_ids + description_ids + inventory_ids
+
+    recipe_ids = memoized_string_to_ids(
+        info['extra.recipe'], self.word_ids, tokenizer=self.nlp)
+    return observation_ids + description_ids + inventory_ids + recipe_ids
 
   def _build_admissible_actions_ids(self, info, shuffle):
     admissible_actions_ids = [
