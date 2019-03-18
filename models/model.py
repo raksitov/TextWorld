@@ -11,6 +11,8 @@ from tensorflow.contrib import layers
 from tensorflow.contrib.cudnn_rnn import CudnnCompatibleGRUCell
 from tensorflow.contrib.cudnn_rnn import CudnnCompatibleLSTMCell
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 DEBUG = False
 EMBEDDINGS_NAME = 'Embeddings'
 
