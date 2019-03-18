@@ -20,6 +20,7 @@ CONFIG = 'config.yaml'
 def play(env, agent, config, evaluation=False):
   if evaluation:
     print('\nEvaluation:')
+  mean_rewards = 0
   max_reward = 0
   max_mean_rewards = 0
   num_episodes = config['eval_episodes'] if evaluation else config['train_episodes']
@@ -28,11 +29,14 @@ def play(env, agent, config, evaluation=False):
     infos_array = dict_to_array(infos, config['environment_batch_size'])
     rewards = [0] * config['environment_batch_size']
     dones = [False] * config['environment_batch_size']
+    max_score = max([info['max_score'] for info in infos_array])
 
     steps = 0
     # TODO: maybe condition on max_steps as well.
     while not all(dones):
-      actions = agent.choose_actions(observations, infos_array, dones, evaluation)
+      win_factor = max_mean_rewards / float(max_score) if config['use_adaptive_epsilon'] else None
+      actions = agent.choose_actions(observations, infos_array, dones, evaluation,
+                                     win_factor=win_factor)
       new_observations, new_rewards, new_dones, new_infos = env.step(actions)
       new_infos_array = dict_to_array(new_infos, config['environment_batch_size'])
       for idx, done in enumerate(dones):
@@ -54,7 +58,6 @@ def play(env, agent, config, evaluation=False):
     mean_rewards = np.mean(rewards)
     max_reward = max(max_reward, max(rewards))
     max_mean_rewards = max(max_mean_rewards, np.mean(rewards))
-    max_score = max([info['max_score'] for info in infos_array])
     wins_percentage = sum([info['has_won'] for info in infos_array]) * 100. / len(infos_array)
     print('Mean rewards: {}({}), steps: {}, max reward: {}({}), wins percentage - {}'.format(
         mean_rewards, max_mean_rewards, steps, max_reward, max_score, wins_percentage))

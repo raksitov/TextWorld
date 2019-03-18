@@ -67,11 +67,17 @@ class TrainableAgent(Agent):
   def _get_summary_dir(self):
     return self.config['summary_dir']
 
-  def choose_actions(self, observations, infos, dones, evaluation):
+  def _get_epsilon(self, win_factor=None):
+    if not win_factor:
+      return self.epsilon
+    return self.config['epsilon_start'] - (self.config['epsilon_start'] -
+                                           self.config['epsilon_end']) * win_factor
+
+  def choose_actions(self, observations, infos, dones, evaluation, win_factor=None):
     random_plays = np.random.uniform(low=0.0, high=1.0, size=len(observations))
     chosen_actions = []
     for observation, info, done, random_play in zip(observations, infos, dones, random_plays):
-      if evaluation or (random_play >= self.epsilon and not done):
+      if evaluation or (random_play >= self._get_epsilon(win_factor) and not done):
         _, probabilities = self.model.predict(
             np.array(self._build_observation_ids(observation, info)).reshape(1, -1),
             self._build_admissible_actions_ids(info, shuffle=False))
