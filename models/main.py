@@ -17,10 +17,13 @@ from os.path import join
 CONFIG = 'config.yaml'
 
 
-def train(env, agent, config):
+def play(env, agent, config, evaluation=False):
+  if evaluation:
+    print('\nEvaluation:')
   max_reward = 0
   max_mean_rewards = 0
-  for episode in tqdm.tqdm(range(config['episodes'])):
+  num_episodes = config['eval_episodes'] if evaluation else config['train_episodes']
+  for episode in tqdm.tqdm(range(num_episodes)):
     observations, infos = env.reset()
     infos_array = dict_to_array(infos, config['environment_batch_size'])
     rewards = [0] * config['environment_batch_size']
@@ -29,11 +32,11 @@ def train(env, agent, config):
     steps = 0
     # TODO: maybe condition on max_steps as well.
     while not all(dones):
-      actions = agent.choose_actions(observations, infos_array, dones)
+      actions = agent.choose_actions(observations, infos_array, dones, evaluation)
       new_observations, new_rewards, new_dones, new_infos = env.step(actions)
       new_infos_array = dict_to_array(new_infos, config['environment_batch_size'])
       for idx, done in enumerate(dones):
-        if not done:
+        if not done and not evaluation:
           agent.add_state(observations[idx],
                           infos_array[idx],
                           actions[idx],
@@ -45,7 +48,7 @@ def train(env, agent, config):
       infos_array = new_infos_array
       rewards = new_rewards
       dones = new_dones
-      if steps % config['update_frequency'] == 0:
+      if not evaluation and steps % config['update_frequency'] == 0:
         agent.train()
       steps += 1
     mean_rewards = np.mean(rewards)
@@ -56,8 +59,6 @@ def train(env, agent, config):
     print('Mean rewards: {}({}), steps: {}, max reward: {}({}), wins percentage - {}'.format(
         mean_rewards, max_mean_rewards, steps, max_reward, max_score, wins_percentage))
     agent.end_episode()
-
-  agent.cleanup()
   return
 
 
@@ -91,8 +92,13 @@ def main():
       batch_size=config['main']['environment_batch_size'],
       parallel=True)
   env = gym.make(env_id)
+
   agent = CustomizableAgent(config, *get_embeddings(config['main']))
-  train(env, agent, config['main'])
+
+  play(env, agent, config['main'])
+  play(env, agent, config['main'], evaluation=True)
+
+  agent.cleanup()
   return
 
 

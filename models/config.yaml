@@ -1,5 +1,6 @@
 main:
-  episodes: 1000
+  train_episodes: 1000
+  eval_episodes: 1
   games_path: '../sample_games'
   vocab_path: '../vocab.txt'
   pretrained_path: '../glove.6B.50d.txt'
@@ -25,8 +26,8 @@ model:
   clip_by_norm: 5.
   optimizer: 'default'
   learning_rate: 0.001
-  states_network: [128, 16]
-  actions_network: [16]
+  states_network: [128, 32]
+  actions_network: [32]
   softmax_scaling_factor: 0
   loss: 'default'
   state_encoder: 'rnn'

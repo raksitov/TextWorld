@@ -67,17 +67,17 @@ class TrainableAgent(Agent):
   def _get_summary_dir(self):
     return self.config['summary_dir']
 
-  def choose_actions(self, observations, infos, dones):
+  def choose_actions(self, observations, infos, dones, evaluation):
     random_plays = np.random.uniform(low=0.0, high=1.0, size=len(observations))
     chosen_actions = []
     for observation, info, done, random_play in zip(observations, infos, dones, random_plays):
-      if random_play < self.epsilon or done:
-        chosen_actions.append(self.rng.choice(info['admissible_commands']))
-      else:
+      if evaluation or (random_play >= self.epsilon and not done):
         _, probabilities = self.model.predict(
             np.array(self._build_observation_ids(observation, info)).reshape(1, -1),
             self._build_admissible_actions_ids(info, shuffle=False))
         chosen_actions.append(info['admissible_commands'][np.argmax(probabilities)])
+      else:
+        chosen_actions.append(self.rng.choice(info['admissible_commands']))
     return chosen_actions
 
   def add_state(self, observation, info, action, new_observation, new_info, reward, done):
