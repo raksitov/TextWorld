@@ -7,9 +7,8 @@ import tensorflow as tf
 
 from tensorflow.python.ops import embedding_ops
 from tensorflow.python.ops.rnn_cell import DropoutWrapper
+from tensorflow.python.ops import rnn_cell
 from tensorflow.contrib import layers
-from tensorflow.contrib.cudnn_rnn import CudnnCompatibleGRUCell
-from tensorflow.contrib.cudnn_rnn import CudnnCompatibleLSTMCell
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -45,9 +44,9 @@ class RNNEncoder(object):
 
   def _get_cell(self):
     if self.cell_type == 'gru':
-      return CudnnCompatibleGRUCell(self.hidden_size)
+      return rnn_cell.GRUCell(self.hidden_size)
     elif self.cell_type == 'lstm':
-      return CudnnCompatibleLSTMCell(self.hidden_size)
+      return rnn_cell.LSTMCell(self.hidden_size)
     else:
       raise Exception('Unknown cell type: {}'.format(self.cell_type))
 
