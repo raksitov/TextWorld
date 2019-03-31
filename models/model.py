@@ -178,17 +178,16 @@ class Model:
 
   def _build_network(self):
     if self.config['state_encoder'] == 'rnn':
-      rnn_encoder = RNNEncoder(hidden_size=self.config['actions_network'][-1],
+      rnn_encoder = RNNEncoder(hidden_size=self.config['rnn_hidden'],
                                keep_prob=self.config['keep_prob'],
                                cell_type=self.config['rnn_cell'])
       # (batch_size, states_len, hidden_size)
-      states_output, _ = rnn_encoder.build_graph(
-          self.states_embeddings, self.states_mask)
-      states_output = states_output[:, -1, :]
+      states_input, _ = rnn_encoder.build_graph(self.states_embeddings, self.states_mask)
+      states_input = tf.reduce_mean(states_input, axis=1)
     else:
       states_input = tf.reduce_mean(self.states_embeddings, axis=1)
-      states_output = _fully_connected_encoder(
-          states_input, self.config['states_network'], 'States')
+    states_output = _fully_connected_encoder(
+        states_input, self.config['states_network'], 'States')
 
     actions_input = tf.reduce_mean(self.actions_embeddings, axis=1)
     actions_output = _fully_connected_encoder(

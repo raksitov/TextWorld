@@ -12,9 +12,9 @@ main:
 
 agent:
   summary_dir: 'Summaries'
-  gamma: 0.8
+  gamma: 0.5
   training_batch_size: 10
-  replay_memory_capacity: 50000
+  replay_memory_capacity: 10000
   replay_memory_priority_fraction: 0.25
   random_seed: 42
   epsilon_start: 1.
@@ -27,11 +27,12 @@ model:
   clip_by_norm: 5.
   optimizer: 'default'
   learning_rate: 0.001
-  states_network: [128, 32]
+  states_network: [32]
   actions_network: [32]
   softmax_scaling_factor: 0
   loss: 'default'
-  state_encoder: 'default'
+  state_encoder: 'rnn'
   rnn_cell: 'gru'
+  rnn_hidden: 128
   keep_prob: 0.9
   share_embeddings: False
