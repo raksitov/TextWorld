@@ -34,3 +34,4 @@ model:
   state_encoder: 'default'
   rnn_cell: 'gru'
   keep_prob: 0.9
+  share_embeddings: False

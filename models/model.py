@@ -147,15 +147,25 @@ class Model:
     return optimizer.apply_gradients(gradients)
 
   def _add_embedding_layer(self, emb_matrix):
-    # Note: the embedding matrix is a tf.constant which means it's not a trainable parameter
     embedding_matrix_init = tf.constant(emb_matrix, tf.float32)
-    self.embedding_matrix = tf.get_variable(
-        name=EMBEDDINGS_NAME,
+
+    self.states_embedding_matrix = tf.get_variable(
+        name='{}_{}'.format(EMBEDDINGS_NAME, '_states'),
         dtype=tf.float32,
         initializer=embedding_matrix_init)
+    self.states_embeddings = embedding_ops.embedding_lookup(
+        self.states_embedding_matrix, self.states)
 
-    self.states_embeddings = embedding_ops.embedding_lookup(self.embedding_matrix, self.states)
-    self.actions_embeddings = embedding_ops.embedding_lookup(self.embedding_matrix, self.actions)
+    if not self.config['share_embeddings']:
+      self.actions_embedding_matrix = tf.get_variable(
+          name='{}_{}'.format(EMBEDDINGS_NAME, '_actions'),
+          dtype=tf.float32,
+          initializer=embedding_matrix_init)
+    else:
+      self.actions_embedding_matrix = self.states_embedding_matrix
+    self.actions_embeddings = embedding_ops.embedding_lookup(
+        self.actions_embedding_matrix, self.actions)
+
     self.states_embeddings = _print_shape(self.states_embeddings, 'Embeddings shape (States): ')
     self.actions_embeddings = _print_shape(self.actions_embeddings, 'Embeddings shape (Actions): ')
 
