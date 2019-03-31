@@ -23,10 +23,11 @@ def _print_shape(tensor, message):
   return tensor
 
 
-def _fully_connected_encoder(layer, network_structure, scope_name):
+def _fully_connected_encoder(layer, network_structure, scope_name, keep_prob=1.0):
   with tf.variable_scope(scope_name):
     last_layer = layers.fully_connected(layer, network_structure[0])
     for i in range(1, len(network_structure)):
+      last_layer = layers.dropout(last_layer, keep_prob=keep_prob)
       last_layer = layers.fully_connected(last_layer, network_structure[i])
   last_layer = _print_shape(last_layer, 'Fully connected shape ({}): '.format(scope_name))
   return last_layer
