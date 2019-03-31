@@ -62,6 +62,8 @@ def play(env, agent, config, evaluation=False):
     print('Mean rewards: {}({}), steps: {}, max reward: {}({}), wins percentage - {}'.format(
         mean_rewards, max_mean_rewards, steps, max_reward, max_score, wins_percentage))
     agent.end_episode()
+    if not evaluation and mean_rewards > 0.99 * max_score:
+      break
   return
 
 
